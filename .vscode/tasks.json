@@ -1,0 +1,38 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "auto run",
+            "type": "shell",
+            "command": "go",
+            "args": [
+                "run",
+                "${file}"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+        },
+        {
+            "label": "run",
+            "type": "shell",
+            "command": "./${fileBasenameNoExtension}",
+            // "group": {"kind": "build", "isDefault": true},
+            "dependsOn": [
+                "build"
+            ]
+        },
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "go",
+            "args": [
+                "build",
+                "${file}"
+            ],
+        }
+    ]
+}
