@@ -150,6 +150,23 @@ func (bc *Blockchain) Mining() bool {
 	return true
 }
 
+// CalculateTotalAmount is to calculate total amount by args.
+func (bc *Blockchain) CalculateTotalAmount(blockchainAddress string) float32 {
+	var totalAmount float32 = 0.0
+	for _, b := range bc.chain {
+		for _, t := range b.transactions {
+			value := t.value
+			if blockchainAddress == t.recipientBlockchainAddress {
+				totalAmount += value
+			}
+			if blockchainAddress == t.senderBlockchainAddress {
+				totalAmount -= value
+			}
+		}
+	}
+	return totalAmount
+}
+
 // Transaction is transaction struct.
 type Transaction struct {
 	senderBlockchainAddress    string
