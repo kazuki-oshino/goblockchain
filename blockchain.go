@@ -9,11 +9,14 @@ import (
 	"time"
 )
 
+// MiningDifficulty is mining difficulty.
+const MiningDifficulty = 3
+
 // Block is block struct.
 type Block struct {
+	timestamp    int64
 	nonce        int
 	previousHash [32]byte
-	timestamp    int64
 	transactions []*Transaction
 }
 
@@ -100,6 +103,37 @@ func (bc *Blockchain) AddTransaction(sender string, recipient string, value floa
 	bc.transactionPool = append(bc.transactionPool, t)
 }
 
+// CopyTransactionPool is to return copy transaction pool.
+func (bc *Blockchain) CopyTransactionPool() []*Transaction {
+	transactions := make([]*Transaction, 0)
+	for _, t := range bc.transactionPool {
+		transactions = append(transactions,
+			NewTransaction(t.senderBlockchainAddress,
+				t.recipientBlockchainAddress,
+				t.value))
+	}
+	return transactions
+}
+
+// ValidProof is validate "000"
+func (bc *Blockchain) ValidProof(nonce int, previousHash [32]byte, transactions []*Transaction, difficulty int) bool {
+	zeros := strings.Repeat("0", difficulty)
+	guessBlock := Block{0, nonce, previousHash, transactions}
+	guessHashStr := fmt.Sprintf("%x", guessBlock.Hash())
+	return guessHashStr[:difficulty] == zeros
+}
+
+// ProofOfWork is proof of work.
+func (bc *Blockchain) ProofOfWork() int {
+	transactions := bc.CopyTransactionPool()
+	previousHash := bc.LastBlock().Hash()
+	nonce := 0
+	for !bc.ValidProof(nonce, previousHash, transactions, MiningDifficulty) {
+		nonce++
+	}
+	return nonce
+}
+
 // Transaction is transaction struct.
 type Transaction struct {
 	senderBlockchainAddress    string
@@ -143,9 +177,12 @@ func main() {
 	blockChain.AddTransaction("A", "B", 1.2)
 	blockChain.AddTransaction("A", "B", 1.5)
 	previousHash := blockChain.LastBlock().Hash()
-	blockChain.CreateBlock(2, previousHash)
+	nonce := blockChain.ProofOfWork()
+	blockChain.CreateBlock(nonce, previousHash)
 
+	blockChain.AddTransaction("C", "X", 2.2)
+	nonce = blockChain.ProofOfWork()
 	previousHash = blockChain.LastBlock().Hash()
-	blockChain.CreateBlock(7, previousHash)
+	blockChain.CreateBlock(nonce, previousHash)
 	blockChain.Print()
 }
