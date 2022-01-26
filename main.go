@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"goblockchain/block"
 	"goblockchain/wallet"
 	"log"
 )
@@ -11,11 +12,29 @@ func init() {
 }
 
 func main() {
-	w := wallet.NewWallet()
-	fmt.Println(w.PrivateKeyStr())
-	fmt.Println(w.PublicKeyStr())
-	fmt.Println(w.BlockchainAddress())
+	walletM := wallet.NewWallet()
+	walletA := wallet.NewWallet()
+	walletB := wallet.NewWallet()
+	t := wallet.NewTransaction(walletA.PrivateKey(), walletA.PublicKey(), walletA.BlockchainAddress(), walletB.BlockchainAddress(), 1.2)
+	blockchain := block.NewBlockchain(walletM.BlockchainAddress())
+	isAdded := blockchain.AddTransaction(walletA.BlockchainAddress(), walletB.BlockchainAddress(), 1.2, walletA.PublicKey(), t.GenerateSignature())
+	fmt.Println("Added? ", isAdded)
 
-	t := wallet.NewTransaction(w.PrivateKey(), w.PublicKey(), w.BlockchainAddress(), "B", 1.2)
-	fmt.Printf("signature %s \n", t.GenerateSignature())
+	blockchain.Mining()
+	blockchain.Print()
+
+	fmt.Printf("A %.1f\n", blockchain.CalculateTotalAmount(walletA.BlockchainAddress()))
+	fmt.Printf("B %.1f\n", blockchain.CalculateTotalAmount(walletB.BlockchainAddress()))
+	fmt.Printf("M %.1f\n", blockchain.CalculateTotalAmount(walletM.BlockchainAddress()))
+
+	t = wallet.NewTransaction(walletA.PrivateKey(), walletA.PublicKey(), walletA.BlockchainAddress(), walletB.BlockchainAddress(), 2.0)
+	blockchain.AddTransaction(walletA.BlockchainAddress(), walletB.BlockchainAddress(), 2.0, walletA.PublicKey(), t.GenerateSignature())
+	t = wallet.NewTransaction(walletA.PrivateKey(), walletA.PublicKey(), walletA.BlockchainAddress(), walletB.BlockchainAddress(), 4.0)
+	blockchain.AddTransaction(walletA.BlockchainAddress(), walletB.BlockchainAddress(), 4.0, walletA.PublicKey(), t.GenerateSignature())
+	blockchain.Mining()
+	blockchain.Print()
+
+	fmt.Printf("A %.1f\n", blockchain.CalculateTotalAmount(walletA.BlockchainAddress()))
+	fmt.Printf("B %.1f\n", blockchain.CalculateTotalAmount(walletB.BlockchainAddress()))
+	fmt.Printf("M %.1f\n", blockchain.CalculateTotalAmount(walletM.BlockchainAddress()))
 }

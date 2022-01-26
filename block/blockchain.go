@@ -1,9 +1,11 @@
 package block
 
 import (
+	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"goblockchain/utils"
 	"log"
 	"strings"
 	"time"
@@ -100,13 +102,35 @@ func (bc *Blockchain) Print() {
 		fmt.Printf("%s Chain %d %s \n", strings.Repeat("=", 25), i, strings.Repeat("=", 25))
 		block.Print()
 	}
-	fmt.Printf("%s", strings.Repeat("*", 25))
+	fmt.Printf("%s\n", strings.Repeat("*", 25))
 }
 
 // AddTransaction is add transaction to transaction pool
-func (bc *Blockchain) AddTransaction(sender string, recipient string, value float32) {
+func (bc *Blockchain) AddTransaction(sender string, recipient string, value float32, senderPublicKey *ecdsa.PublicKey, s *utils.Signature) bool {
 	t := NewTransaction(sender, recipient, value)
-	bc.transactionPool = append(bc.transactionPool, t)
+
+	if sender == MiningSender {
+		bc.transactionPool = append(bc.transactionPool, t)
+		return true
+	}
+
+	if bc.VerifyTransactionSignature(senderPublicKey, s, t) {
+		// if bc.CalculateTotalAmount(sender) < value {
+		// 	log.Println("ERROR: NOT enough balance in wallet.")
+		// 	return false
+		// }
+		bc.transactionPool = append(bc.transactionPool, t)
+		return true
+	}
+	log.Println("ERROR: VERIFY TRANSACTION")
+	return false
+}
+
+// VerifyTransactionSignature is verify transaction by public key, signature, transaction.
+func (bc *Blockchain) VerifyTransactionSignature(senderPublicKey *ecdsa.PublicKey, s *utils.Signature, t *Transaction) bool {
+	m, _ := json.Marshal(t)
+	h := sha256.Sum256(m)
+	return ecdsa.Verify(senderPublicKey, h[:], s.R, s.S)
 }
 
 // CopyTransactionPool is to return copy transaction pool.
@@ -142,7 +166,7 @@ func (bc *Blockchain) ProofOfWork() int {
 
 // Mining is mining.
 func (bc *Blockchain) Mining() bool {
-	bc.AddTransaction(MiningSender, bc.blockchainAddress, MiningReward)
+	bc.AddTransaction(MiningSender, bc.blockchainAddress, MiningReward, nil, nil)
 	nonce := bc.ProofOfWork()
 	previousHash := bc.LastBlock().Hash()
 	bc.CreateBlock(nonce, previousHash)
