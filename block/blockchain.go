@@ -1,12 +1,14 @@
 package block
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"goblockchain/utils"
 	"log"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -42,6 +44,21 @@ func NewBlock(nonce int, previousHash [32]byte, transactions []*Transaction) *Bl
 		timestamp:    time.Now().UnixNano(),
 		transactions: transactions,
 	}
+}
+
+// PreviousHash is to return Block's PreviousHash.
+func (b *Block) PreviousHash() [32]byte {
+	return b.previousHash
+}
+
+// Nonce is to return Block's Nonce.
+func (b *Block) Nonce() int {
+	return b.nonce
+}
+
+// Transactions is to return Block's Transactions.
+func (b *Block) Transactions() []*Transaction {
+	return b.transactions
 }
 
 // Print is print block data.
@@ -129,6 +146,11 @@ func (bc *Blockchain) TransactionPool() []*Transaction {
 	return bc.transactionPool
 }
 
+// ClearTransactionPool is
+func (bc *Blockchain) ClearTransactionPool() {
+	bc.transactionPool = bc.transactionPool[:0]
+}
+
 // MarshalJSON is override Blockchain's marshaljson.
 func (bc *Blockchain) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
@@ -143,6 +165,13 @@ func (bc *Blockchain) CreateBlock(nonce int, previousHash [32]byte) *Block {
 	b := NewBlock(nonce, previousHash, bc.transactionPool)
 	bc.chain = append(bc.chain, b)
 	bc.transactionPool = []*Transaction{}
+	for _, n := range bc.neighbors {
+		endpoint := fmt.Sprintf("http://%s/transactions", n)
+		client := &http.Client{}
+		req, _ := http.NewRequest("DELETE", endpoint, nil)
+		resp, _ := client.Do(req)
+		log.Printf("%v", resp)
+	}
 	return b
 }
 
@@ -164,6 +193,22 @@ func (bc *Blockchain) Print() {
 func (bc *Blockchain) CreateTransaction(sender string, recipient string, value float32, senderPublicKey *ecdsa.PublicKey, s *utils.Signature) bool {
 	isTransacted := bc.AddTransaction(sender, recipient, value, senderPublicKey, s)
 
+	if isTransacted {
+		for _, n := range bc.neighbors {
+			publicKeyStr := fmt.Sprintf("%064x%064x", senderPublicKey.X.Bytes(),
+				senderPublicKey.Y.Bytes())
+			signatureStr := s.String()
+			bt := &TransactionRequest{
+				&sender, &recipient, &publicKeyStr, &value, &signatureStr}
+			m, _ := json.Marshal(bt)
+			buf := bytes.NewBuffer(m)
+			endpoint := fmt.Sprintf("http://%s/transactions", n)
+			client := &http.Client{}
+			req, _ := http.NewRequest("PUT", endpoint, buf)
+			resp, _ := client.Do(req)
+			log.Printf("%v", resp)
+		}
+	}
 	return isTransacted
 }
 
@@ -264,6 +309,26 @@ func (bc *Blockchain) CalculateTotalAmount(blockchainAddress string) float32 {
 		}
 	}
 	return totalAmount
+}
+
+// ValidChain is valid chain.
+func (bc *Blockchain) ValidChain(chain []*Block) bool {
+	preBlock := chain[0]
+	currentIndex := 1
+	for currentIndex < len(chain) {
+		b := chain[currentIndex]
+		if b.previousHash != preBlock.Hash() {
+			return false
+		}
+
+		if !bc.ValidProof(b.Nonce(), b.PreviousHash(), b.Transactions(), MiningDifficulty) {
+			return false
+		}
+
+		preBlock = b
+		currentIndex++
+	}
+	return true
 }
 
 // Transaction is transaction struct.

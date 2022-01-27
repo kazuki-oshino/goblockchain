@@ -101,6 +101,40 @@ func (bcs *BlockchainServer) Transactions(w http.ResponseWriter, req *http.Reque
 			m = utils.JSONStatus("success")
 		}
 		io.WriteString(w, string(m))
+
+	case http.MethodPut:
+		decoder := json.NewDecoder(req.Body)
+		var t block.TransactionRequest
+		err := decoder.Decode(&t)
+		if err != nil {
+			log.Printf("ERROR: %v", err)
+			io.WriteString(w, string(utils.JSONStatus("fail")))
+			return
+		}
+		if !t.Validate() {
+			log.Println("ERROR: missing field(s)")
+			io.WriteString(w, string(utils.JSONStatus("fail")))
+			return
+		}
+		publicKey := utils.PublicKeyFromString(*t.SenderPublicKey)
+		signature := utils.SignatureFromString(*t.Signature)
+		bc := bcs.GetBlockchain()
+		isUpdated := bc.AddTransaction(*t.SenderBlockchainAddress,
+			*t.RecipientBlockchainAddress, *t.Value, publicKey, signature)
+
+		w.Header().Add("Content-Type", "application/json")
+		var m []byte
+		if !isUpdated {
+			w.WriteHeader(http.StatusBadRequest)
+			m = utils.JSONStatus("fail")
+		} else {
+			m = utils.JSONStatus("success")
+		}
+		io.WriteString(w, string(m))
+	case http.MethodDelete:
+		bc := bcs.GetBlockchain()
+		bc.ClearTransactionPool()
+		io.WriteString(w, string(utils.JSONStatus("success")))
 	default:
 		log.Println("ERROR: Invalid HTTP Method")
 		w.WriteHeader(http.StatusBadRequest)
