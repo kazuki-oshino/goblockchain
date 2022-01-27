@@ -8,6 +8,7 @@ import (
 	"goblockchain/utils"
 	"log"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -16,6 +17,7 @@ const (
 	MiningDifficulty = 3
 	MiningSender     = "THE BLOCKCHAIN"
 	MiningReward     = 1.0
+	MiningTimerSec   = 20
 )
 
 // Block is block struct.
@@ -73,6 +75,7 @@ type Blockchain struct {
 	chain             []*Block
 	blockchainAddress string
 	port              uint16
+	mux               sync.Mutex
 }
 
 // NewBlockchain is to return new Blockchain struct.
@@ -189,12 +192,25 @@ func (bc *Blockchain) ProofOfWork() int {
 
 // Mining is mining.
 func (bc *Blockchain) Mining() bool {
+	bc.mux.Lock()
+	defer bc.mux.Unlock()
+
+	if len(bc.transactionPool) == 0 {
+		return false
+	}
+
 	bc.AddTransaction(MiningSender, bc.blockchainAddress, MiningReward, nil, nil)
 	nonce := bc.ProofOfWork()
 	previousHash := bc.LastBlock().Hash()
 	bc.CreateBlock(nonce, previousHash)
 	log.Println("action=mining, status=success")
 	return true
+}
+
+// StartMining is start mining automatic.
+func (bc *Blockchain) StartMining() {
+	bc.Mining()
+	_ = time.AfterFunc(time.Second*MiningTimerSec, bc.StartMining)
 }
 
 // CalculateTotalAmount is to calculate total amount by args.
@@ -266,4 +282,18 @@ func (tr *TransactionRequest) Validate() bool {
 		return false
 	}
 	return true
+}
+
+// AmountResponse is amount response struct.
+type AmountResponse struct {
+	Amount float32 `json:"amount"`
+}
+
+// MarshalJSON is override AmountResponse's marshaljson.
+func (ar *AmountResponse) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Amount float32 `json:"amount"`
+	}{
+		Amount: ar.Amount,
+	})
 }
