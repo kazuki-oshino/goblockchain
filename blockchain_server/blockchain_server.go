@@ -55,6 +55,7 @@ func (bcs *BlockchainServer) GetChain(w http.ResponseWriter, req *http.Request) 
 	}
 }
 
+// Transactions is
 func (bcs *BlockchainServer) Transactions(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
@@ -164,6 +165,8 @@ func (bcs *BlockchainServer) Amount(w http.ResponseWriter, req *http.Request) {
 
 // Run is to run server.
 func (bcs *BlockchainServer) Run() {
+	bcs.GetBlockchain().Run()
+
 	http.HandleFunc("/", bcs.GetChain)
 	http.HandleFunc("/transactions", bcs.Transactions)
 	http.HandleFunc("/mine", bcs.Mine)
