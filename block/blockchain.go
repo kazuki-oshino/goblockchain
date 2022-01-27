@@ -145,6 +145,7 @@ func (bc *Blockchain) Chain() []*Block {
 // Run is
 func (bc *Blockchain) Run() {
 	bc.StartSyncNeighbors()
+	bc.ResolveConflicts()
 }
 
 // SetNeighbors is set Neighbors.
@@ -326,6 +327,15 @@ func (bc *Blockchain) Mining() bool {
 	previousHash := bc.LastBlock().Hash()
 	bc.CreateBlock(nonce, previousHash)
 	log.Println("action=mining, status=success")
+
+	for _, n := range bc.neighbors {
+		endpoint := fmt.Sprintf("http://%s/consensus", n)
+		client := &http.Client{}
+		req, _ := http.NewRequest("PUT", endpoint, nil)
+		resp, _ := client.Do(req)
+		log.Printf("%v", resp)
+	}
+
 	return true
 }
 
