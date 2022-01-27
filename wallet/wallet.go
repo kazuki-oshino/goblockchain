@@ -77,7 +77,7 @@ func (w *Wallet) PublicKey() *ecdsa.PublicKey {
 
 // PublicKeyStr is to return Wallet's publicKey string
 func (w *Wallet) PublicKeyStr() string {
-	return fmt.Sprintf("%x%x", w.publicKey.X.Bytes(), w.publicKey.Y.Bytes())
+	return fmt.Sprintf("%064x%064x", w.publicKey.X.Bytes(), w.publicKey.Y.Bytes())
 }
 
 // BlockchainAddress is to return Wallet's blockchain address.

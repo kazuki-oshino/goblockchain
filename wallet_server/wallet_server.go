@@ -1,8 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
-	"fmt"
+	"goblockchain/block"
 	"goblockchain/utils"
 	"goblockchain/wallet"
 	"html/template"
@@ -79,13 +80,39 @@ func (ws *WalletServer) CreateTransaction(w http.ResponseWriter, req *http.Reque
 			return
 		}
 
-		fmt.Println(*t.SenderPublicKey)
-		fmt.Println(*t.SenderPrivateKey)
-		fmt.Println(*t.SenderBlockchainAddress)
-		fmt.Println(*t.RecipientBlockchainAddress)
-		fmt.Println(*t.Value)
+		publicKey := utils.PublicKeyFromString(*t.SenderPublicKey)
+		privateKey := utils.PrivateKeyFromString(*t.SenderPrivateKey, publicKey)
+		value, err := strconv.ParseFloat(*t.Value, 32)
+		if err != nil {
+			log.Println("ERROR: parse error")
+			io.WriteString(w, string(utils.JSONStatus("fail")))
+			return
+		}
 
-		// io.WriteString(w, string(utils.JSONStatus("success")))
+		value32 := float32(value)
+
+		w.Header().Add("Content-Type", "application/json")
+
+		transaction := wallet.NewTransaction(privateKey, publicKey, *t.SenderBlockchainAddress, *t.RecipientBlockchainAddress, value32)
+		signature := transaction.GenerateSignature()
+		signatureStr := signature.String()
+
+		bt := &block.TransactionRequest{
+			SenderBlockchainAddress:    t.SenderBlockchainAddress,
+			RecipientBlockchainAddress: t.RecipientBlockchainAddress,
+			SenderPublicKey:            t.SenderPublicKey,
+			Value:                      &value32,
+			Signature:                  &signatureStr,
+		}
+		m, _ := json.Marshal(bt)
+		buf := bytes.NewBuffer(m)
+
+		resp, _ := http.Post(ws.Gateway()+"/transactions", "application/json", buf)
+		if resp.StatusCode == http.StatusCreated {
+			io.WriteString(w, string(utils.JSONStatus("success")))
+			return
+		}
+		io.WriteString(w, string(utils.JSONStatus("fail")))
 	default:
 		w.WriteHeader(http.StatusBadRequest)
 		log.Println("ERROR: Invalid HTTP Method")
